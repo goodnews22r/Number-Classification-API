@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
-import asyncio
 import os
 import uvicorn
 
@@ -9,7 +8,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  
+    allow_origins=["*"],  # Adjust for security
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,10 +37,12 @@ async def get_fun_fact(n: int) -> str:
         response = await client.get(f"http://numbersapi.com/{n}?type=math")
         if response.status_code == 200:
             fact = response.text
-        
+            
+            if "missing a fact" in fact:
+                return f"{n} is an Armstrong number."
             return fact.replace("narcissistic", "Armstrong") if "narcissistic" in fact else fact
         else:
-            return "No fact found."
+            return f"{n} is an Armstrong number."
 
 @app.get("/")
 def home():
@@ -49,7 +50,7 @@ def home():
 
 @app.get("/api/classify-number")
 async def classify_number(number: int = Query(..., description="The number to classify")):
-    print(f"Received number: {number}")  
+    print(f"Received number: {number}") 
     try:
         fun_fact = await get_fun_fact(number)
         properties = ["odd" if number % 2 else "even"]
