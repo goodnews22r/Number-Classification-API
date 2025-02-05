@@ -2,13 +2,14 @@ from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
 import asyncio
+import os
+import uvicorn
 
 app = FastAPI()
 
-# Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust for security
+    allow_origins=["*"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -43,7 +44,7 @@ def home():
 
 @app.get("/api/classify-number")
 async def classify_number(number: int = Query(..., description="The number to classify")):
-    print(f"Received number: {number}")  # Debugging line
+    print(f"Received number: {number}")  
     try:
         fun_fact = await get_fun_fact(number)
         properties = ["odd" if number % 2 else "even"]
@@ -57,12 +58,16 @@ async def classify_number(number: int = Query(..., description="The number to cl
             "digit_sum": get_digit_sum(number),
             "fun_fact": fun_fact
         }
-        print(response)  # Debugging line
+        print(response)  
         return response
     except Exception as e:
-        print(f"Error: {e}")  # Debugging line
+        print(f"Error: {e}")  
         return {"number": str(number), "error": True}
 
 @app.get("/api/test-httpx")
 async def test_httpx():
     return await get_fun_fact(371)
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
