@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
-import asyncio
 import os
 import uvicorn
 
@@ -14,6 +13,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 def is_prime(n: int) -> bool:
     if n < 2:
@@ -69,5 +69,6 @@ async def test_httpx():
     return await get_fun_fact(371)
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8000))
+    port = int(os.getenv("PORT", 8080))  
     uvicorn.run(app, host="0.0.0.0", port=port)
+
