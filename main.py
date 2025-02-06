@@ -1,66 +1,75 @@
-from fastapi import FastAPI, HTTPException, Query
-import aiohttp
-import math
+from fastapi import FastAPI, Query
+from fastapi.middleware.cors import CORSMiddleware
+import httpx
+import asyncio
+import os
+import uvicorn
 
 app = FastAPI()
 
-# Helper functions
+# Enable CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Adjust for security
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 def is_prime(n: int) -> bool:
-    if n <= 1:
+    if n < 2:
         return False
-    for i in range(2, int(math.sqrt(n)) + 1):
+    for i in range(2, int(n ** 0.5) + 1):
         if n % i == 0:
             return False
     return True
 
 def is_perfect(n: int) -> bool:
-    return sum(i for i in range(1, abs(n)) if abs(n) % i == 0) == abs(n)
+    return n > 1 and sum(i for i in range(1, n) if n % i == 0) == n
 
 def is_armstrong(n: int) -> bool:
-    digits = [int(d) for d in str(abs(n))]  # Handle negatives
-    return sum(d ** len(digits) for d in digits) == abs(n)
+    digits = [int(d) for d in str(n)]
+    return sum(d ** len(digits) for d in digits) == n
+
+def get_digit_sum(n: int) -> int:
+    return sum(int(d) for d in str(n))
 
 async def get_fun_fact(n: int) -> str:
-    url = f"http://numbersapi.com/{n}/math?json"
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return data.get("text", f"No fun fact available for {n}.")
-        return f"No fun fact available for {n}."
-    except Exception:
-        return f"Could not fetch a fun fact for {n}."
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"http://numbersapi.com/{n}")
+        return response.text if response.status_code == 200 else "No fact found."
+
+@app.get("/")
+def home():
+    return {"message": "API is running!"}
 
 @app.get("/api/classify-number")
-async def classify_number(number: str = Query(..., description="Provide an integer to classify")):
-    # Handle missing number parameter
-    if number.strip() == "":
-        raise HTTPException(status_code=400, detail={"error": True, "number": ""})
+async def classify_number(number: int = Query(..., description="The number to classify")):
+    print(f"Received number: {number}")  # Debugging line
+    try:
+        fun_fact = await get_fun_fact(number)
+        properties = ["odd" if number % 2 else "even"]
+        if is_armstrong(number):
+            properties.append("armstrong")
+        response = {
+            "number": number,
+            "is_prime": is_prime(number),
+            "is_perfect": is_perfect(number),
+            "properties": properties,
+            "digit_sum": get_digit_sum(number),
+            "fun_fact": fun_fact
+        }
+        print(response)  # Debugging line
+        return response
+    except Exception as e:
+        print(f"Error: {e}")  # Debugging line
+        return {"number": str(number), "error": True}
 
-    # Validate input
-    if not number.lstrip("-").isdigit():
-        raise HTTPException(status_code=400, detail={"error": True, "number": number})
+@app.get("/api/test-httpx")
+async def test_httpx():
+    return await get_fun_fact(371)
 
-    num = int(number)
-
-    result = {
-        "error": False,
-        "number": num,
-        "is_prime": is_prime(num),
-        "is_perfect": is_perfect(num),
-        "properties": [],
-        "digit_sum": sum(int(digit) for digit in str(abs(num))),
-        "fun_fact": await get_fun_fact(num),
-    }
-
-    if is_armstrong(num):
-        result["properties"].append("armstrong")
-    if num % 2 == 0:
-        result["properties"].append("even")
-    else:
-        result["properties"].append("odd")
-
-    result["properties"].sort()
-
-    return result
+# Run the API with dynamic port binding for Railway
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
