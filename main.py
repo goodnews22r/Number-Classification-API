@@ -29,7 +29,7 @@ def is_perfect(n: int) -> bool:
     return n > 1 and sum(i for i in range(1, n) if n % i == 0) == n
 
 def is_armstrong(n: int) -> bool:
-    abs_n = abs(n)  
+    abs_n = abs(n)
     digits = [int(d) for d in str(abs_n)]
     return sum(d ** len(digits) for d in digits) == abs_n
 
