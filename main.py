@@ -47,24 +47,28 @@ async def get_fun_fact(n: int) -> str:
         return "No fun fact available (timeout)."
     return "No fun fact found."
 
-async def fetch_fun_fact(number: int, response: dict):
-    response["fun_fact"] = await get_fun_fact(number)
+async def get_fun_fact(number: int):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"https://numbersapi.p.rapidapi.com/{number}?json=true", headers=headers)
+        return response.json().get("text", "No fun fact available.")
+
 
 @app.get("/")
 def home():
     return {"message": "API is running!"}
 
 @app.get("/api/classify-number")
-async def classify_number(
-    number: str = Query(..., description="The number to classify"),
-    background_tasks: BackgroundTasks = BackgroundTasks(), 
-):
+def classify_number(number: str = Query(..., description="The number to classify")):
     try:
         num = int(number)
     except ValueError:
         return JSONResponse(status_code=400, content={"error": True, "number": number})
 
     properties = ["odd" if num % 2 else "even"]
+
+    if num < 0 and is_armstrong(num):
+        properties.append("armstrong")
+
     if num >= 0 and is_armstrong(num):
         properties.append("armstrong")
 
