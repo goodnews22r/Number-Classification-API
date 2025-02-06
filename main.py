@@ -48,7 +48,7 @@ async def classify_number(number: int = Query(..., description="The number to cl
     print(f"Received number: {number}")  # Debugging line
     try:
         fun_fact = await get_fun_fact(number)
-        properties = ["even" if number % 2 else "odd"]
+        properties = ["odd" if number % 2 else "even"]
         if is_armstrong(number):
             properties.append("armstrong")
         response = {
