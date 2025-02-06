@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import BackgroundTasks
+from fastapi.responses import JSONResponse
 import httpx
 import asyncio
 import os
@@ -29,30 +30,27 @@ def is_perfect(n: int) -> bool:
     return n > 1 and sum(i for i in range(1, n) if n % i == 0) == n
 
 def is_armstrong(n: int) -> bool:
-    digits = [int(d) for d in str(n)]
-    return sum(d ** len(digits) for d in digits) == n
+    abs_n = abs(n)  # Use absolute value for negative numbers
+    digits = [int(d) for d in str(abs_n)]
+    return sum(d ** len(digits) for d in digits) == abs_n
 
 def get_digit_sum(n: int) -> int:
-    return sum(int(d) for d in str(n))
+    return sum(int(d) for d in str(abs(n)))  # Use absolute value
+
 
 async def fetch_fun_fact(number: int, response: dict):
     response["fun_fact"] = await get_fun_fact(number)
-
-async def get_fun_fact(n: int) -> str:
-    async with httpx.AsyncClient() as client:
-        response = await client.get(f"http://numbersapi.com/{n}")
-        return response.text if response.status_code == 200 else "No fact found."
 
 @app.get("/")
 def home():
     return {"message": "API is running!"}
 
 @app.get("/api/classify-number")
-async def classify_number(number: str, background_tasks: BackgroundTasks):
+async def classify_number(number: str = Query(..., description="The number to classify")):
     try:
         num = int(number)
     except ValueError:
-        raise HTTPException(status_code=400, detail={"error": True, "number": number})
+        return JSONResponse(status_code=400, content={"error": True, "number": number})
 
     properties = ["odd" if num % 2 else "even"]
     if num >= 0 and is_armstrong(num):
@@ -67,10 +65,11 @@ async def classify_number(number: str, background_tasks: BackgroundTasks):
         "fun_fact": "Fetching..."
     }
 
-    # Fetch fun fact in the background (won't delay response)
+    # Fetch fun fact in the background
     background_tasks.add_task(fetch_fun_fact, num, response)
     
     return response
+
 @app.get("/api/test-httpx")
 async def test_httpx():
     return await get_fun_fact(371)
