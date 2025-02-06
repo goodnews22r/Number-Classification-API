@@ -1,20 +1,19 @@
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import BackgroundTasks
 from fastapi.responses import JSONResponse
 import httpx
-import asyncio
+import threading
+import time
 import os
 import uvicorn
 
 app = FastAPI()
 
-# Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust for security
+    allow_origins=["*"], 
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET"],
     allow_headers=["*"],
 )
 
@@ -30,13 +29,23 @@ def is_perfect(n: int) -> bool:
     return n > 1 and sum(i for i in range(1, n) if n % i == 0) == n
 
 def is_armstrong(n: int) -> bool:
-    abs_n = abs(n)  # Use absolute value for negative numbers
+    abs_n = abs(n)  
     digits = [int(d) for d in str(abs_n)]
     return sum(d ** len(digits) for d in digits) == abs_n
 
 def get_digit_sum(n: int) -> int:
-    return sum(int(d) for d in str(abs(n)))  # Use absolute value
+    return sum(int(d) for d in str(abs(n)))  
 
+async def get_fun_fact(n: int) -> str:
+    url = f"http://numbersapi.com/{n}"
+    try:
+        async with httpx.AsyncClient(timeout=0.5) as client: 
+            response = await client.get(url)
+            if response.status_code == 200:
+                return response.text
+    except httpx.TimeoutException:
+        return "No fun fact available (timeout)."
+    return "No fun fact found."
 
 async def fetch_fun_fact(number: int, response: dict):
     response["fun_fact"] = await get_fun_fact(number)
@@ -46,7 +55,10 @@ def home():
     return {"message": "API is running!"}
 
 @app.get("/api/classify-number")
-async def classify_number(number: str = Query(..., description="The number to classify")):
+async def classify_number(
+    number: str = Query(..., description="The number to classify"),
+    background_tasks: BackgroundTasks = BackgroundTasks(), 
+):
     try:
         num = int(number)
     except ValueError:
@@ -65,16 +77,20 @@ async def classify_number(number: str = Query(..., description="The number to cl
         "fun_fact": "Fetching..."
     }
 
-    # Fetch fun fact in the background
     background_tasks.add_task(fetch_fun_fact, num, response)
     
     return response
 
-@app.get("/api/test-httpx")
-async def test_httpx():
-    return await get_fun_fact(371)
+def keep_alive():
+    while True:
+        try:
+            httpx.get("https://number-classification-api-production-ca7b.up.railway.app/api/classify-number?number=1")
+        except:
+            pass
+        time.sleep(300) 
 
-# Run the API with dynamic port binding for Railway
+threading.Thread(target=keep_alive, daemon=True).start()
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
