@@ -1,5 +1,6 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import BackgroundTasks
 import httpx
 import asyncio
 import os
@@ -34,6 +35,9 @@ def is_armstrong(n: int) -> bool:
 def get_digit_sum(n: int) -> int:
     return sum(int(d) for d in str(n))
 
+async def fetch_fun_fact(number: int, response: dict):
+    response["fun_fact"] = await get_fun_fact(number)
+
 async def get_fun_fact(n: int) -> str:
     async with httpx.AsyncClient() as client:
         response = await client.get(f"http://numbersapi.com/{n}")
@@ -44,27 +48,29 @@ def home():
     return {"message": "API is running!"}
 
 @app.get("/api/classify-number")
-async def classify_number(number: int = Query(..., description="The number to classify")):
-    print(f"Received number: {number}")  # Debugging line
+async def classify_number(number: str, background_tasks: BackgroundTasks):
     try:
-        fun_fact = await get_fun_fact(number)
-        properties = ["odd" if number % 2 else "even"]
-        if is_armstrong(number):
-            properties.append("armstrong")
-        response = {
-            "number": number,
-            "is_prime": is_prime(number),
-            "is_perfect": is_perfect(number),
-            "properties": properties,
-            "digit_sum": get_digit_sum(number),
-            "fun_fact": fun_fact
-        }
-        print(response)  # Debugging line
-        return response
-    except Exception as e:
-        print(f"Error: {e}")  # Debugging line
-        return {"number": str(number), "error": True}
+        num = int(number)
+    except ValueError:
+        raise HTTPException(status_code=400, detail={"error": True, "number": number})
 
+    properties = ["odd" if num % 2 else "even"]
+    if num >= 0 and is_armstrong(num):
+        properties.append("armstrong")
+
+    response = {
+        "number": num,
+        "is_prime": is_prime(num) if num >= 2 else False,
+        "is_perfect": is_perfect(num) if num >= 2 else False,
+        "properties": sorted(properties),
+        "digit_sum": get_digit_sum(abs(num)),
+        "fun_fact": "Fetching..."
+    }
+
+    # Fetch fun fact in the background (won't delay response)
+    background_tasks.add_task(fetch_fun_fact, num, response)
+    
+    return response
 @app.get("/api/test-httpx")
 async def test_httpx():
     return await get_fun_fact(371)
