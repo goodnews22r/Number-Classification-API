@@ -59,10 +59,10 @@ async def classify_number(
     number: str = Query(..., description="The number to classify"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
-    try:
-        num = int(number)
-    except ValueError:
+    if not number.lstrip("-").isdigit():
         return JSONResponse(status_code=400, content={"error": True, "number": number})
+    
+    num = int(number)  
 
     properties = ["odd" if num % 2 else "even"]
 
