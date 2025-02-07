@@ -17,6 +17,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ✅ Reject invalid input IMMEDIATELY (before executing FastAPI tasks)
+def validate_number(number: str):
+    if not number.lstrip("-").isdigit():
+        return None
+    return int(number)
+
+# ✅ Optimized Math Functions
 def is_prime(n: int) -> bool:
     if n < 2:
         return False
@@ -29,17 +36,17 @@ def is_perfect(n: int) -> bool:
     return n > 1 and sum(i for i in range(1, n) if n % i == 0) == n
 
 def is_armstrong(n: int) -> bool:
-    abs_n = abs(n)  
-    digits = [int(d) for d in str(abs_n)]
-    return sum(d ** len(digits) for d in digits) == abs_n
+    digits = [int(d) for d in str(abs(n))]
+    return sum(d ** len(digits) for d in digits) == abs(n)
 
 def get_digit_sum(n: int) -> int:
-    return sum(int(d) for d in str(abs(n)))  
+    return sum(int(d) for d in str(abs(n)))
 
+# ✅ Stricter Timeout (300ms)
 async def get_fun_fact(n: int) -> str:
     url = f"http://numbersapi.com/{n}"
     try:
-        async with httpx.AsyncClient(timeout=0.5) as client: 
+        async with httpx.AsyncClient(timeout=0.3) as client:
             response = await client.get(url)
             if response.status_code == 200:
                 return response.text
@@ -59,42 +66,29 @@ async def classify_number(
     number: str = Query(..., description="The number to classify"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
-    if not number.lstrip("-").isdigit():
+    num = validate_number(number)  # ✅ Validate Input BEFORE Executing Anything
+    if num is None:
         return JSONResponse(status_code=400, content={"error": True, "number": number})
-    
-    num = int(number)  
 
     properties = ["odd" if num % 2 else "even"]
 
-    if num < 0 and is_armstrong(num):
-        properties.append("armstrong")
-
-    if num >= 0 and is_armstrong(num):
+    if is_armstrong(num):
         properties.append("armstrong")
 
     response = {
         "number": num,
-        "is_prime": is_prime(num) if num >= 2 else False,
-        "is_perfect": is_perfect(num) if num >= 2 else False,
+        "is_prime": is_prime(num),
+        "is_perfect": is_perfect(num),
         "properties": sorted(properties),
-        "digit_sum": get_digit_sum(abs(num)),
+        "digit_sum": get_digit_sum(num),
         "fun_fact": "Fetching..."
     }
 
     background_tasks.add_task(fetch_fun_fact, num, response)
-    
+
     return response
 
-def keep_alive():
-    while True:
-        try:
-            httpx.get("https://number-classification-api-production-ca7b.up.railway.app/api/classify-number?number=1")
-        except:
-            pass
-        time.sleep(300) 
-
-threading.Thread(target=keep_alive, daemon=True).start()
-
+# ✅ Removed Unnecessary Keep-Alive Function (Handled by Railway)
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
