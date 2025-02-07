@@ -1,11 +1,10 @@
-from fastapi import FastAPI, Query, BackgroundTasks
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import httpx
-import threading
-import time
 import os
 import uvicorn
+import concurrent.futures
 
 app = FastAPI()
 
@@ -17,13 +16,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ Reject invalid input IMMEDIATELY (before executing FastAPI tasks)
+executor = concurrent.futures.ThreadPoolExecutor()  # ✅ Non-blocking threading
+
+# ✅ Validate number input before any processing
 def validate_number(number: str):
     if not number.lstrip("-").isdigit():
         return None
     return int(number)
 
-# ✅ Optimized Math Functions
+# ✅ Optimized mathematical checks
 def is_prime(n: int) -> bool:
     if n < 2:
         return False
@@ -42,20 +43,16 @@ def is_armstrong(n: int) -> bool:
 def get_digit_sum(n: int) -> int:
     return sum(int(d) for d in str(abs(n)))
 
-# ✅ Stricter Timeout (300ms)
-async def get_fun_fact(n: int) -> str:
+# ✅ Fetch fun fact in a separate thread (faster)
+def get_fun_fact_sync(n: int) -> str:
     url = f"http://numbersapi.com/{n}"
     try:
-        async with httpx.AsyncClient(timeout=0.3) as client:
-            response = await client.get(url)
-            if response.status_code == 200:
-                return response.text
+        response = httpx.get(url, timeout=0.3)
+        if response.status_code == 200:
+            return response.text
     except httpx.TimeoutException:
         return "No fun fact available (timeout)."
     return "No fun fact found."
-
-async def fetch_fun_fact(number: int, response: dict):
-    response["fun_fact"] = await get_fun_fact(number)
 
 @app.get("/")
 def home():
@@ -64,14 +61,12 @@ def home():
 @app.get("/api/classify-number")
 async def classify_number(
     number: str = Query(..., description="The number to classify"),
-    background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
-    num = validate_number(number)  # ✅ Validate Input BEFORE Executing Anything
+    num = validate_number(number)  
     if num is None:
         return JSONResponse(status_code=400, content={"error": True, "number": number})
 
     properties = ["odd" if num % 2 else "even"]
-
     if is_armstrong(num):
         properties.append("armstrong")
 
@@ -81,14 +76,14 @@ async def classify_number(
         "is_perfect": is_perfect(num),
         "properties": sorted(properties),
         "digit_sum": get_digit_sum(num),
-        "fun_fact": "Fetching..."
+        "fun_fact": "Fetching..."  # ✅ Async fetch
     }
 
-    background_tasks.add_task(fetch_fun_fact, num, response)
+    # ✅ Fetch fun fact in background using ThreadPoolExecutor
+    executor.submit(lambda: response.update({"fun_fact": get_fun_fact_sync(num)}))
 
     return response
 
-# ✅ Removed Unnecessary Keep-Alive Function (Handled by Railway)
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
