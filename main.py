@@ -16,15 +16,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-executor = concurrent.futures.ThreadPoolExecutor()  # ✅ Non-blocking threading
+executor = concurrent.futures.ThreadPoolExecutor()  # ✅ Fast async execution
 
-# ✅ Validate number input before any processing
+# ✅ Validate number input before processing
 def validate_number(number: str):
     if not number.lstrip("-").isdigit():
         return None
     return int(number)
 
-# ✅ Optimized mathematical checks
+# ✅ Optimized Mathematical Functions
 def is_prime(n: int) -> bool:
     if n < 2:
         return False
@@ -43,11 +43,11 @@ def is_armstrong(n: int) -> bool:
 def get_digit_sum(n: int) -> int:
     return sum(int(d) for d in str(abs(n)))
 
-# ✅ Fetch fun fact in a separate thread (faster)
+# ✅ Fetch fun fact with a faster timeout
 def get_fun_fact_sync(n: int) -> str:
     url = f"http://numbersapi.com/{n}"
     try:
-        response = httpx.get(url, timeout=0.3)
+        response = httpx.get(url, timeout=0.2)  # ✅ Lower timeout for speed
         if response.status_code == 200:
             return response.text
     except httpx.TimeoutException:
@@ -76,10 +76,10 @@ async def classify_number(
         "is_perfect": is_perfect(num),
         "properties": sorted(properties),
         "digit_sum": get_digit_sum(num),
-        "fun_fact": "Fetching..."  # ✅ Async fetch
+        "fun_fact": "Fetching..."
     }
 
-    # ✅ Fetch fun fact in background using ThreadPoolExecutor
+    # ✅ Fetch fun fact asynchronously using ThreadPoolExecutor
     executor.submit(lambda: response.update({"fun_fact": get_fun_fact_sync(num)}))
 
     return response
