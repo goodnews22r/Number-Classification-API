@@ -11,9 +11,9 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["*"]
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET"],
     allow_headers=["*"],
 )
 
@@ -29,7 +29,7 @@ def is_perfect(n: int) -> bool:
     return n > 1 and sum(i for i in range(1, n) if n % i == 0) == n
 
 def is_armstrong(n: int) -> bool:
-    abs_n = abs(n)
+    abs_n = abs(n)  
     digits = [int(d) for d in str(abs_n)]
     return sum(d ** len(digits) for d in digits) == abs_n
 
@@ -47,18 +47,18 @@ async def get_fun_fact(n: int) -> str:
         return "No fun fact available (timeout)."
     return "No fun fact found."
 
-async def get_fun_fact(number: int):
-    async with httpx.AsyncClient() as client:
-        response = await client.get(f"https://numbersapi.p.rapidapi.com/{number}?json=true", headers=headers)
-        return response.json().get("text", "No fun fact available.")
-
+async def fetch_fun_fact(number: int, response: dict):
+    response["fun_fact"] = await get_fun_fact(number)
 
 @app.get("/")
 def home():
     return {"message": "API is running!"}
 
 @app.get("/api/classify-number")
-def classify_number(number: str = Query(..., description="The number to classify")):
+async def classify_number(
+    number: str = Query(..., description="The number to classify"),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+):
     try:
         num = int(number)
     except ValueError:
