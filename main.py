@@ -47,7 +47,7 @@ def get_digit_sum(n: int) -> int:
 def get_fun_fact_sync(n: int) -> str:
     url = f"http://numbersapi.com/{n}"
     try:
-        response = httpx.get(url, timeout=0.1)  # ✅ Lower timeout for speed
+        response = httpx.get(url, timeout=0.0)  # ✅ Lower timeout for speed
         if response.status_code == 200:
             return response.text
     except httpx.TimeoutException:
